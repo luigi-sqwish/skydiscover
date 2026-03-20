@@ -38,6 +38,8 @@ class SimilarityMemory(MemoStructure):
         for key, val in init_dict.items():
             init_obs += f"\n<{key}>{val}</{key}>"
         best_candidate = await best_match_by_embedding(init_obs, list(self.sim_db.keys()))
+        if best_candidate is None:
+            return {"retrieved_similar_tasks": {}}
         memo = {
             "retrieved_similar_tasks": self.sim_db[best_candidate]
         }

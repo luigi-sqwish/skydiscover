@@ -66,6 +66,10 @@ def resolve_alma_root(
     return alma_root
 
 
+def resolve_agentic_codebase_root() -> str:
+    return str(resolve_alma_root())
+
+
 def _module_belongs_to_root(module_name: str, root: Path) -> bool:
     module = sys.modules.get(module_name)
     module_file = getattr(module, "__file__", None)

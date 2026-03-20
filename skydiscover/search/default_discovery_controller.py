@@ -91,6 +91,8 @@ class DiscoveryController:
 
         self.agentic_generator = None
         if self.config.agentic.enabled:
+            if not self.config.agentic.codebase_root:
+                self.config.agentic.codebase_root = self._resolve_agentic_codebase_root()
             from skydiscover.llm.agentic_generator import AgenticGenerator
 
             self.agentic_generator = AgenticGenerator(self.llms, self.config.agentic)
@@ -140,6 +142,23 @@ class DiscoveryController:
             if existing
             else f"# Task Description\n\n{task_description}"
         )
+
+    def _resolve_agentic_codebase_root(self) -> Optional[str]:
+        """Ask the evaluator module for an agentic codebase root when config omits one."""
+        module = getattr(self.evaluator, "_eval_module", None)
+        resolver = getattr(module, "resolve_agentic_codebase_root", None)
+        if not callable(resolver):
+            return None
+
+        try:
+            resolved = resolver()
+        except Exception as exc:
+            logger.warning("Failed to resolve agentic codebase root from evaluator: %s", exc)
+            return None
+
+        if not resolved:
+            return None
+        return os.path.abspath(str(resolved))
 
     def _init_context_builder(self):
         """Initialize the appropriate context builder based on config."""

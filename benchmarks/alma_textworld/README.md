@@ -39,5 +39,6 @@ uv run skydiscover-run benchmarks/alma_textworld/initial_program.py \
 
 - `single_task` and `multi_task` are supported.
 - `generalization` is intentionally unsupported in this prototype.
-- Agentic generation is enabled and points at `../alma` by default so the model
-  can inspect ALMA's runtime contracts while editing the memory file.
+- Agentic generation resolves its codebase from `ALMA_ROOT` when set, and
+  otherwise falls back to the default sibling `../alma` layout used by the
+  evaluator.

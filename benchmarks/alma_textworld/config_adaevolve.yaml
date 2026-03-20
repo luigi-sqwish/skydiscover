@@ -90,7 +90,6 @@ evaluator:
 
 agentic:
   enabled: true
-  codebase_root: "../alma"
 
 diff_based_generation: true
 max_solution_length: 60000
