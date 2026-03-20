@@ -190,6 +190,8 @@ For containerized and Harbor evaluators, SkyDiscover preserves the existing `tra
 - `SKYDISCOVER_PHASE`
 - `SKYDISCOVER_MODE`
 
+For `search.type: adaevolve`, you can also enable explicit Pareto optimization by configuring `search.database.pareto_objectives` and returning those objective metrics directly from the evaluator. In that mode, `combined_score` becomes optional and is only used as a scalar fallback/proxy when configured.
+
 ### Starting Solution (optional)
 
 The initial program is **optional**. When omitted, the LLM generates a solution from scratch. If provided, it marks the region to mutate with EVOLVE-BLOCK markers. Everything outside is left untouched.
