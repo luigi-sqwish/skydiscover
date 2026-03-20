@@ -1,5 +1,10 @@
 """Tests for Evaluator — result normalization and cascade threshold logic."""
 
+import textwrap
+
+import pytest
+
+from skydiscover.config import EvaluatorConfig
 from skydiscover.evaluation.evaluation_result import EvaluationResult
 from skydiscover.evaluation.evaluator import Evaluator
 
@@ -54,3 +59,27 @@ class TestPassesThreshold:
     def test_empty_metrics(self):
         inst = _make_evaluator()
         assert inst._passes_threshold({}, 0.5) is False
+
+
+def test_evaluator_calls_optional_config_validator(tmp_path):
+    evaluator_path = tmp_path / "validated_eval.py"
+    evaluator_path.write_text(
+        textwrap.dedent(
+            """
+            def validate_config(config):
+                raise ValueError(f"unsupported task_mode={config.task_mode}")
+
+            def evaluate(program_path):
+                return {"combined_score": 1.0}
+            """
+        )
+    )
+
+    with pytest.raises(ValueError, match="unsupported task_mode=generalization"):
+        Evaluator(
+            EvaluatorConfig(
+                evaluation_file=str(evaluator_path),
+                task_mode="generalization",
+                val_split="validation",
+            )
+        )

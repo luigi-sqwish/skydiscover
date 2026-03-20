@@ -1,0 +1,52 @@
+{
+  "benchmark_eval_score": {
+    "benchmark_overall_eval_score": 0.42,
+    "benchmark_overall_eval_standard_deviation": 0.08
+  },
+  "examples": [
+    {
+      "init_environment": {
+        "goal": "put the apple in the fridge",
+        "obs": "Kitchen with a closed fridge."
+      },
+      "memo_retrieved": {},
+      "steps": [
+        "open fridge",
+        "take apple"
+      ],
+      "final_reward": 0.0
+    },
+    {
+      "init_environment": {
+        "goal": "heat the soup on the stove",
+        "obs": "You are in the kitchen."
+      },
+      "memo_retrieved": {
+        "retrieved_similar_tasks": {
+          "reward": 1.0
+        }
+      },
+      "steps": [
+        "turn on stove"
+      ],
+      "final_reward": 0.3
+    },
+    {
+      "error_info": {
+        "error_type": "RuntimeError",
+        "message": "Prompt exceeded model context limit."
+      },
+      "final_reward": 0.0
+    }
+  ],
+  "token_usage": {
+    "gpt-4o-mini": {
+      "total_tokens": 120,
+      "prompt_tokens": 70,
+      "completion_tokens": 50,
+      "completion_tokens_details": {
+        "reasoning_tokens": 11
+      }
+    }
+  }
+}

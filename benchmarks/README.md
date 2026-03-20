@@ -51,6 +51,7 @@ uv run skydiscover-run benchmarks/math/circle_packing/initial_program.py \
 | [`gpu_mode/`](gpu_mode/) | GPU | 4 | Triton kernel optimization (vecadd, grayscale, trimul, MLA decode) |
 | [`frontier-cs-eval/`](frontier-cs-eval/) | Algorithms | 172 | Competitive programming (Frontier-CS benchmark, Docker judge) |
 | [`arc_benchmark/`](arc_benchmark/) | Reasoning | — | ARC-AGI visual reasoning tasks |
+| [`alma_textworld/`](alma_textworld/) | Agentic memory | 1 | Prototype bridge for optimizing ALMA TextWorld memory designs |
 | [`ale_bench/`](ale_bench/) | Algorithms | 10 | Algorithmic contest problems (C++, ALE-Bench) |
 | [`image_gen/`](image_gen/) | Creative | 1 | AI image generation evolution |
 | [`prompt_optimization/`](prompt_optimization/) | Prompts | 1 | Evolve natural-language prompts, not code (HotPotQA) |

@@ -74,6 +74,9 @@ class Evaluator:
 
         self.evaluate_function = module.evaluate
         self._eval_module = module
+        validator = getattr(module, "validate_config", None)
+        if callable(validator):
+            validator(self.config)
         self._validate_cascade_configuration(module)
 
     def _validate_cascade_configuration(self, module) -> None:

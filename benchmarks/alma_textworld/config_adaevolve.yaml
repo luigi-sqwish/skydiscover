@@ -1,0 +1,97 @@
+# AdaEvolve configuration for ALMA TextWorld memory optimization.
+#
+# Run from the skydiscover repo root:
+#   uv run skydiscover-run benchmarks/alma_textworld/initial_program.py \
+#     benchmarks/alma_textworld/evaluator.py \
+#     -c benchmarks/alma_textworld/config_adaevolve.yaml \
+#     --search adaevolve \
+#     --iterations 20
+
+max_iterations: 100
+checkpoint_interval: 10
+log_level: "INFO"
+random_seed: 42
+max_parallel_iterations: 1
+
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+  api_base: "https://api.openai.com/v1"
+  temperature: 0.7
+  max_tokens: 32000
+  timeout: 600
+
+search:
+  type: "adaevolve"
+  num_context_programs: 4
+  database:
+    population_size: 20
+    num_islands: 2
+    decay: 0.9
+    intensity_min: 0.15
+    intensity_max: 0.5
+    use_adaptive_search: true
+    use_ucb_selection: true
+    use_migration: true
+    use_unified_archive: true
+    migration_interval: 15
+    migration_count: 5
+    fitness_weight: 1.0
+    novelty_weight: 0.0
+    diversity_strategy: "code"
+    use_dynamic_islands: true
+    max_islands: 5
+    spawn_productivity_threshold: 0.015
+    spawn_cooldown_iterations: 30
+    use_paradigm_breakthrough: true
+    paradigm_window_size: 10
+    paradigm_improvement_threshold: 0.12
+    paradigm_max_uses: 2
+    paradigm_max_tried: 10
+    paradigm_num_to_generate: 3
+    enable_error_retry: true
+    max_error_retries: 2
+
+prompt:
+  system_message: |
+    You are optimizing a single-file ALMA memory implementation for the TextWorld benchmark.
+
+    The candidate you produce is evaluated by ALMA, not imported directly by SkyDiscover.
+    Output one complete Python file that remains self-contained and runnable inside ALMA's runtime.
+
+    Required contract:
+    - The file must define a class inheriting from MemoStructure.
+    - The class must implement async general_retrieve(self, recorder) -> Dict.
+    - The class must implement async general_update(self, recorder) -> None.
+    - Keep ALMA runtime imports compatible with the ALMA repository layout, such as:
+      - from agents.memo_structure import Sub_memo_layer, MemoStructure
+      - from eval_envs.base_envs import Basic_Recorder
+      - optional helpers from utils.hire_agent
+
+    Optimization goal:
+    - Maximize ALMA's benchmark_overall_eval_score on TextWorld train tasks.
+    - Improve memory usefulness for task transfer, trajectory reuse, and retrieval quality.
+    - Prefer robust, simple memory mechanisms over fragile complexity.
+    - Use evaluator feedback from empty retrievals, sampled execution failures, and low-reward trajectories.
+
+    Constraints:
+    - Produce exactly one Python file.
+    - Do not assume any files besides the candidate itself are evolved.
+    - Preserve correctness of async retrieve/update behavior.
+
+evaluator:
+  task_mode: "single_task"
+  train_split: "train"
+  timeout: 7200
+  max_retries: 0
+  cascade_evaluation: true
+  cascade_thresholds: [0.5, 0.5]
+
+agentic:
+  enabled: true
+  codebase_root: "../alma"
+
+diff_based_generation: true
+max_solution_length: 60000
+language: "python"
