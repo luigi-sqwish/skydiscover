@@ -58,6 +58,10 @@ For a detailed breakdown of results for each algorithm, see the respective paper
 | ⚡ | [gpu_mode/](benchmarks/gpu_mode/) | Systems | 4 | GPU kernel optimization |
 | 🧩 | [frontier-cs-eval/](benchmarks/frontier-cs-eval/) | Algorithms | 172 | [Frontier-CS](https://frontier-cs.org/) competitive programming |
 | 🧠 | [arc_benchmark/](benchmarks/arc_benchmark/) | Reasoning | — | ARC-AGI visual reasoning |
+| 🧭 | [alma_textworld/](benchmarks/alma_textworld/) | Agentic memory | 1 | ALMA TextWorld memory optimization |
+| 🏠 | [alma_alfworld/](benchmarks/alma_alfworld/) | Agentic memory | 1 | ALMA ALFWorld memory optimization |
+| 🕹️ | [alma_minihack/](benchmarks/alma_minihack/) | Agentic memory | 1 | ALMA MiniHack memory optimization |
+| 🧱 | [alma_babaisai/](benchmarks/alma_babaisai/) | Agentic memory | 1 | ALMA BabaIsAI memory optimization |
 | 💻 | [ale_bench/](benchmarks/ale_bench/) | Algorithms | 10 | Algorithmic programming contests |
 | 🎨 | [image_gen/](benchmarks/image_gen/) | Creative | 1 | AI image generation evolution |
 | 💬 | [prompt_optimization/](benchmarks/prompt_optimization/) | NLP | 1 | HotPotQA prompt evolution |

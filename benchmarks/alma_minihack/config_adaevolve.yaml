@@ -1,9 +1,9 @@
-# AdaEvolve configuration for ALMA TextWorld memory optimization.
+# AdaEvolve configuration for ALMA MiniHack memory optimization.
 #
 # Run from the skydiscover repo root:
-#   uv run skydiscover-run benchmarks/alma_textworld/initial_program.py \
-#     benchmarks/alma_textworld/evaluator.py \
-#     -c benchmarks/alma_textworld/config_adaevolve.yaml \
+#   uv run skydiscover-run benchmarks/alma_minihack/initial_program.py \
+#     benchmarks/alma_minihack/evaluator.py \
+#     -c benchmarks/alma_minihack/config_adaevolve.yaml \
 #     --search adaevolve \
 #     --iterations 20
 
@@ -55,7 +55,7 @@ search:
 
 prompt:
   system_message: |
-    You are optimizing a single-file ALMA memory implementation for the TextWorld benchmark.
+    You are optimizing a single-file ALMA memory implementation for the MiniHack benchmark.
 
     The candidate you produce is evaluated by ALMA, not imported directly by SkyDiscover.
     Output one complete Python file that remains self-contained and runnable inside ALMA's runtime.
@@ -84,7 +84,7 @@ evaluator:
   task_mode: "single_task"
   train_split: "train"
   val_split: "eval_in_distribution"
-  final_split: "eval_in_distribution"
+  final_split: "eval_out_of_distribution"
   timeout: 7200
   max_retries: 0
   cascade_evaluation: true

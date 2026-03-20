@@ -1,9 +1,9 @@
-# AdaEvolve configuration for ALMA TextWorld memory optimization.
+# AdaEvolve configuration for ALMA BabaIsAI memory optimization.
 #
 # Run from the skydiscover repo root:
-#   uv run skydiscover-run benchmarks/alma_textworld/initial_program.py \
-#     benchmarks/alma_textworld/evaluator.py \
-#     -c benchmarks/alma_textworld/config_adaevolve.yaml \
+#   uv run skydiscover-run benchmarks/alma_babaisai/initial_program.py \
+#     benchmarks/alma_babaisai/evaluator.py \
+#     -c benchmarks/alma_babaisai/config_adaevolve.yaml \
 #     --search adaevolve \
 #     --iterations 20
 
@@ -55,7 +55,7 @@ search:
 
 prompt:
   system_message: |
-    You are optimizing a single-file ALMA memory implementation for the TextWorld benchmark.
+    You are optimizing a single-file ALMA memory implementation for the BabaIsAI benchmark.
 
     The candidate you produce is evaluated by ALMA, not imported directly by SkyDiscover.
     Output one complete Python file that remains self-contained and runnable inside ALMA's runtime.

@@ -1,7 +1,7 @@
-# ALMA TextWorld
+# ALMA BabaIsAI
 
 SkyDiscover benchmark for optimizing a single ALMA `MemoStructure`
-implementation on TextWorld.
+implementation on BabaIsAI.
 
 ## What It Does
 
@@ -44,9 +44,9 @@ and update protocol for the requested split.
 From the `skydiscover` repo root:
 
 ```bash
-uv run skydiscover-run benchmarks/alma_textworld/initial_program.py \
-  benchmarks/alma_textworld/evaluator.py \
-  -c benchmarks/alma_textworld/config_adaevolve.yaml \
+uv run skydiscover-run benchmarks/alma_babaisai/initial_program.py \
+  benchmarks/alma_babaisai/evaluator.py \
+  -c benchmarks/alma_babaisai/config_adaevolve.yaml \
   --search adaevolve \
   --iterations 20
 ```

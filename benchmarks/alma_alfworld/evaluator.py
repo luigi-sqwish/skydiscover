@@ -1,9 +1,9 @@
-"""SkyDiscover bridge for optimizing ALMA TextWorld memory implementations."""
+"""SkyDiscover bridge for optimizing ALMA ALFWorld memory implementations."""
 
-from skydiscover.evaluation.alma_bridge import ALMA_TEXTWORLD_TASK, make_alma_benchmark_adapter
+from skydiscover.evaluation.alma_bridge import ALMA_ALFWORLD_TASK, make_alma_benchmark_adapter
 
 
-TASK_DESCRIPTOR = ALMA_TEXTWORLD_TASK
+TASK_DESCRIPTOR = ALMA_ALFWORLD_TASK
 _ADAPTER = make_alma_benchmark_adapter(TASK_DESCRIPTOR, benchmark_file=__file__)
 
 

@@ -1,7 +1,7 @@
-# ALMA TextWorld
+# ALMA MiniHack
 
 SkyDiscover benchmark for optimizing a single ALMA `MemoStructure`
-implementation on TextWorld.
+implementation on MiniHack.
 
 ## What It Does
 
@@ -20,12 +20,11 @@ not co-optimize prompts or ALMA config files.
 - `multi_task`
 - `generalization`
 
-The populated ALMA split names for this benchmark are:
+The supported ALMA split names are:
 
 - `train`
 - `eval_in_distribution`
-- `eval_out_of_distribution` is currently empty upstream and should not be used
-  for the default final score.
+- `eval_out_of_distribution`
 
 For every evaluation call, SkyDiscover preserves ALMA's task-specific rollout
 and update protocol for the requested split.
@@ -44,9 +43,9 @@ and update protocol for the requested split.
 From the `skydiscover` repo root:
 
 ```bash
-uv run skydiscover-run benchmarks/alma_textworld/initial_program.py \
-  benchmarks/alma_textworld/evaluator.py \
-  -c benchmarks/alma_textworld/config_adaevolve.yaml \
+uv run skydiscover-run benchmarks/alma_minihack/initial_program.py \
+  benchmarks/alma_minihack/evaluator.py \
+  -c benchmarks/alma_minihack/config_adaevolve.yaml \
   --search adaevolve \
   --iterations 20
 ```
