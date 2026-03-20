@@ -7,10 +7,17 @@ picked up automatically.
 
 import asyncio
 import logging
+import os
 from typing import Any, Dict, Optional
 
 from skydiscover.api import DiscoveryResult
 from skydiscover.config import Config
+from skydiscover.evaluation.coordinator import merge_prefixed_artifacts, merge_prefixed_metrics
+from skydiscover.evaluation.external_bridge import (
+    create_runtime_evaluator,
+    write_external_evaluator_bridge,
+)
+from skydiscover.utils.metrics import get_authoritative_score
 
 logger = logging.getLogger(__name__)
 
@@ -166,10 +173,18 @@ async def run(
 
     bridge_provider_env(config_obj)
 
+    file_suffix = os.path.splitext(program_path or "")[1] or config_obj.file_suffix or ".py"
+    evaluator_bridge_path = write_external_evaluator_bridge(
+        config_obj=config_obj,
+        evaluation_file=evaluator_path,
+        file_suffix=file_suffix,
+        output_dir=output_dir,
+    )
+
     evo_config, job_config, db_config = _map_config(
         config_obj,
         iterations,
-        evaluator_path,
+        evaluator_bridge_path,
         output_dir,
     )
 
@@ -180,7 +195,7 @@ async def run(
     # ShinkaEvolve supports passing code as strings directly
     with open(program_path, "r") as f:
         init_str = f.read()
-    with open(evaluator_path, "r") as f:
+    with open(evaluator_bridge_path, "r") as f:
         eval_str = f.read()
 
     # ShinkaEvolve runs the evaluator as a CLI subprocess:
@@ -289,6 +304,33 @@ if __name__ == "__main__":
 
     best_skydiscover = _to_skydiscover_program(best_sp) if best_sp else None
     best_score = float(best_sp.combined_score or 0.0) if best_sp else 0.0
+    if best_sp and best_skydiscover:
+        runtime_evaluator = create_runtime_evaluator(
+            config_obj,
+            evaluation_file=evaluator_path,
+            file_suffix=file_suffix,
+        )
+        try:
+            final_result = await runtime_evaluator.evaluate_program(
+                best_sp.code,
+                best_sp.id,
+                mode="test",
+            )
+        finally:
+            runtime_evaluator.close()
+
+        best_skydiscover.metrics = merge_prefixed_metrics(
+            best_skydiscover.metrics or {},
+            final_result.metrics,
+            "final_",
+            include_legacy_test_alias=True,
+        )
+        best_skydiscover.artifacts = merge_prefixed_artifacts(
+            best_skydiscover.artifacts or {},
+            final_result.artifacts or {},
+            final_split_name=config_obj.evaluator.resolved_final_split,
+        )
+        best_score = get_authoritative_score(best_skydiscover.metrics)
 
     return DiscoveryResult(
         best_program=best_skydiscover,

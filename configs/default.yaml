@@ -29,6 +29,10 @@ prompt:
 
 # Evaluator configuration
 evaluator:
+  task_mode: "single_task"  # single_task | multi_task | generalization
+  train_split: "train"
+  # val_split: "val"        # required for generalization
+  # final_split: "test"     # optional; defaults to the selection split
   timeout: 10000
   max_retries: 3
   cascade_evaluation: false

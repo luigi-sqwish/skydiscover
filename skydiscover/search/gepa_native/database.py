@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from skydiscover.config import DatabaseConfig
 from skydiscover.search.base_database import Program, ProgramDatabase
-from skydiscover.utils.metrics import get_score
+from skydiscover.utils.metrics import get_score, is_auxiliary_metric_name
 
 from .pareto_utils import select_program_candidate_from_pareto_front
 
@@ -115,6 +115,8 @@ class GEPANativeDatabase(ProgramDatabase):
         # Update per-metric best tracking
         if program.metrics:
             for metric_name, value in program.metrics.items():
+                if is_auxiliary_metric_name(metric_name):
+                    continue
                 if not isinstance(value, (int, float)):
                     continue
                 current = self.metric_best.get(metric_name)

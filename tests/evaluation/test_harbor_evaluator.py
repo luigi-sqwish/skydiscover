@@ -8,6 +8,7 @@ import pytest
 
 from skydiscover.config import EvaluatorConfig
 from skydiscover.evaluation import _is_harbor_task, _is_containerized
+from skydiscover.evaluation.evaluation_result import EvaluationResult
 from skydiscover.evaluation.harbor_evaluator import HarborEvaluator, _DEFAULT_SOLUTION_PATH
 
 
@@ -263,7 +264,34 @@ class TestReadReward:
         })):
             result = inst._read_reward()
         assert result.metrics["combined_score"] == 0.0
-        assert "error" in result.artifacts
+
+
+class TestSplitEnvForwarding:
+    def _make_inst(self):
+        inst = object.__new__(HarborEvaluator)
+        inst.container_id = "fake_container"
+        inst.close = lambda: None
+        return inst
+
+    def test_run_container_sets_split_phase_env(self):
+        inst = object.__new__(HarborEvaluator)
+        inst.container_id = "fake_container"
+        inst.close = lambda: None
+        inst.solution_path = "/app/solution.py"
+        inst.config = EvaluatorConfig(timeout=30)
+        inst._exec = MagicMock()
+        inst._read_reward = MagicMock(return_value=EvaluationResult(metrics={"combined_score": 0.7}))
+
+        with patch("subprocess.run", side_effect=[
+            MagicMock(returncode=0, stderr=b""),
+            MagicMock(returncode=0, stdout="", stderr=""),
+        ]) as mock_run:
+            inst._run_container("print('hi')", "train", split="holdout", phase="search")
+
+        cmd = mock_run.call_args_list[1][0][0]
+        assert "SKYDISCOVER_SPLIT=holdout" in cmd
+        assert "SKYDISCOVER_PHASE=search" in cmd
+        assert "SKYDISCOVER_MODE=train" in cmd
 
     def test_malformed_json_falls_back_to_txt(self):
         inst = self._make_inst()

@@ -313,6 +313,10 @@ class EvaluatorConfig:
     evaluation_file: Optional[str] = None
     file_suffix: str = ".py"
     is_image_mode: bool = False
+    task_mode: str = "single_task"
+    train_split: str = "train"
+    val_split: Optional[str] = None
+    final_split: Optional[str] = None
 
     timeout: int = 360
     max_retries: int = 3
@@ -325,6 +329,37 @@ class EvaluatorConfig:
     # evaluator and appends llm_* metrics to the result.
     # This will read from prompt.evaluator_system_message if provided, otherwise use the default system prompt.
     llm_as_judge: bool = False
+
+    def validate(self) -> None:
+        valid_modes = {"single_task", "multi_task", "generalization"}
+        if self.task_mode not in valid_modes:
+            raise ValueError(
+                f"Invalid evaluator.task_mode '{self.task_mode}'. "
+                f"Expected one of: {', '.join(sorted(valid_modes))}."
+            )
+        if not self.train_split:
+            raise ValueError("evaluator.train_split must be a non-empty string.")
+        if self.task_mode == "generalization" and not self.val_split:
+            raise ValueError("evaluator.val_split is required when task_mode='generalization'.")
+
+    @property
+    def selection_split(self) -> str:
+        if self.task_mode == "generalization":
+            assert self.val_split is not None
+            return self.val_split
+        return self.train_split
+
+    @property
+    def resolved_final_split(self) -> str:
+        return self.final_split or self.selection_split
+
+    def search_splits(self) -> List[str]:
+        if self.task_mode == "generalization":
+            assert self.val_split is not None
+            if self.val_split == self.train_split:
+                return [self.train_split]
+            return [self.train_split, self.val_split]
+        return [self.train_split]
 
 
 # ═════════════════════════════════════════════════════════════════════════════════════════════
@@ -712,6 +747,10 @@ class Config:
                 "evaluation_file": self.evaluator.evaluation_file,
                 "file_suffix": self.evaluator.file_suffix,
                 "is_image_mode": self.evaluator.is_image_mode,
+                "task_mode": self.evaluator.task_mode,
+                "train_split": self.evaluator.train_split,
+                "val_split": self.evaluator.val_split,
+                "final_split": self.evaluator.final_split,
                 "timeout": self.evaluator.timeout,
                 "max_retries": self.evaluator.max_retries,
                 "cascade_evaluation": self.evaluator.cascade_evaluation,
@@ -839,6 +878,10 @@ def apply_overrides(
     agentic: bool = False,
     search: Optional[str] = None,
     system_prompt: Optional[str] = None,
+    task_mode: Optional[str] = None,
+    train_split: Optional[str] = None,
+    val_split: Optional[str] = None,
+    final_split: Optional[str] = None,
 ) -> None:
     """Apply runtime overrides (model, api_base, etc.) to a loaded Config in place."""
     if model:
@@ -922,3 +965,14 @@ def apply_overrides(
     if system_prompt:
         config.context_builder.system_message = system_prompt
         config.system_prompt_override = system_prompt
+
+    if task_mode:
+        config.evaluator.task_mode = task_mode
+    if train_split:
+        config.evaluator.train_split = train_split
+    if val_split is not None:
+        config.evaluator.val_split = val_split
+    if final_split is not None:
+        config.evaluator.final_split = final_split
+
+    config.evaluator.validate()

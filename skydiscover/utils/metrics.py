@@ -4,6 +4,13 @@ Utilities for metric scoring and formatting.
 
 from typing import Any, Dict
 
+_AUXILIARY_METRIC_PREFIXES = ("train_", "val_", "final_", "test_")
+
+
+def is_auxiliary_metric_name(metric_name: str) -> bool:
+    """Return True for split-prefixed bookkeeping metrics."""
+    return metric_name.startswith(_AUXILIARY_METRIC_PREFIXES)
+
 
 def get_score(metrics: Dict[str, Any]) -> float:
     """Return combined_score if available, otherwise average of all numeric metric values."""
@@ -16,6 +23,21 @@ def get_score(metrics: Dict[str, Any]) -> float:
             pass
     numeric_values = [v for v in metrics.values() if isinstance(v, (int, float))]
     return sum(numeric_values) / len(numeric_values) if numeric_values else 0.0
+
+
+def get_authoritative_score(metrics: Dict[str, Any]) -> float:
+    """Prefer final/test metrics for user-facing reporting when they exist."""
+    if not metrics:
+        return 0.0
+
+    for prefix in ("final_", "test_"):
+        prefixed_metrics = {
+            key[len(prefix) :]: value for key, value in metrics.items() if key.startswith(prefix)
+        }
+        if prefixed_metrics:
+            return get_score(prefixed_metrics)
+
+    return get_score(metrics)
 
 
 def format_metrics(metrics: Dict[str, Any]) -> str:

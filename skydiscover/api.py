@@ -32,7 +32,7 @@ from typing import Any, Callable, Dict, List, Optional, Union
 from skydiscover.config import Config, apply_overrides, load_config
 from skydiscover.runner import Runner
 from skydiscover.search.base_database import Program
-from skydiscover.utils.metrics import get_score
+from skydiscover.utils.metrics import get_authoritative_score
 from skydiscover.utils.prepare import cleanup_temp, prepare_evaluator, prepare_program
 
 logger = logging.getLogger(__name__)
@@ -66,6 +66,10 @@ def run_discovery(
     system_prompt: Optional[str] = None,
     api_base: Optional[str] = None,
     cleanup: bool = True,
+    task_mode: Optional[str] = None,
+    train_split: Optional[str] = None,
+    val_split: Optional[str] = None,
+    final_split: Optional[str] = None,
 ) -> DiscoveryResult:
     """Run a discovery process and return the best result.
 
@@ -82,6 +86,10 @@ def run_discovery(
         system_prompt: Domain-specific context for the LLM.
         api_base: Base URL for an OpenAI-compatible API.
         cleanup: Remove temp files after the run.
+        task_mode: Evaluation mode ("single_task", "multi_task", "generalization").
+        train_split: Training split name for split-aware evaluators.
+        val_split: Validation split name for generalization mode.
+        final_split: Final authoritative split name (defaults to the selection split).
 
     Returns:
         DiscoveryResult with best program, score, solution, metrics, and output directory.
@@ -97,6 +105,10 @@ def run_discovery(
             agentic=agentic,
             model=model,
             search=search,
+            task_mode=task_mode,
+            train_split=train_split,
+            val_split=val_split,
+            final_split=final_split,
             system_prompt=system_prompt,
             api_base=api_base,
         )
@@ -111,6 +123,10 @@ async def _run_discovery_async(
     model: Optional[str] = None,
     iterations: Optional[int] = None,
     search: Optional[str] = None,
+    task_mode: Optional[str] = None,
+    train_split: Optional[str] = None,
+    val_split: Optional[str] = None,
+    final_split: Optional[str] = None,
     agentic: bool = False,
     output_dir: Optional[str] = None,
     system_prompt: Optional[str] = None,
@@ -135,6 +151,10 @@ async def _run_discovery_async(
             agentic=agentic,
             search=search,
             system_prompt=system_prompt,
+            task_mode=task_mode,
+            train_split=train_split,
+            val_split=val_split,
+            final_split=final_split,
         )
 
         # Prepare the program (optional — None means "from scratch")
@@ -231,7 +251,7 @@ async def _run_discovery_async(
         if best_program:
             best_solution = best_program.solution
             metrics = best_program.metrics or {}
-            best_score = get_score(metrics)
+            best_score = get_authoritative_score(metrics)
 
         initial_score = controller.initial_score
 

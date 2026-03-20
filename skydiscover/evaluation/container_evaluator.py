@@ -128,6 +128,8 @@ class ContainerizedEvaluator:
         program_solution: str,
         program_id: str = "",
         mode: str = "train",
+        split: str = "train",
+        phase: str = "search",
     ) -> EvaluationResult:
         """Evaluate one candidate program and return scores.
 
@@ -136,6 +138,8 @@ class ContainerizedEvaluator:
             program_id: Optional identifier for logging.
             mode: ``"train"`` for hot-loop evaluation, ``"test"`` for
                   authoritative/publish evaluation.
+            split: Logical data split name for split-aware evaluators.
+            phase: ``"search"`` or ``"final"``.
         """
         start_time = time.time()
         label = f" {program_id}" if program_id else ""
@@ -145,7 +149,7 @@ class ContainerizedEvaluator:
             try:
                 result = await asyncio.wait_for(
                     asyncio.get_running_loop().run_in_executor(
-                        None, self._run_container, program_solution, mode
+                        None, self._run_container, program_solution, mode, split, phase
                     ),
                     timeout=self.config.timeout,
                 )
@@ -192,7 +196,13 @@ class ContainerizedEvaluator:
     # Container interaction — override for alternative interfaces
     # ------------------------------------------------------------------
 
-    def _run_container(self, program_solution: str, mode: str) -> EvaluationResult:
+    def _run_container(
+        self,
+        program_solution: str,
+        mode: str,
+        split: str = "train",
+        phase: str = "search",
+    ) -> EvaluationResult:
         """Inject the candidate program and run evaluate.sh inside the container.
 
         Uses a unique /tmp path per call so concurrent evaluations don't collide.
@@ -202,17 +212,30 @@ class ContainerizedEvaluator:
         """
         candidate_path = self._inject_file(program_solution, self.program_suffix)
         try:
-            return self._run_single_in_container(candidate_path, mode)
+            return self._run_single_in_container(candidate_path, mode, split=split, phase=phase)
         finally:
             self._remove_file(candidate_path)
 
-    def _run_single_in_container(self, candidate_path: str, mode: str) -> EvaluationResult:
+    def _run_single_in_container(
+        self,
+        candidate_path: str,
+        mode: str,
+        *,
+        split: str = "train",
+        phase: str = "search",
+    ) -> EvaluationResult:
         """Execute evaluate.sh inside the container and parse its JSON output."""
         try:
             proc = subprocess.run(
                 [
                     "docker",
                     "exec",
+                    "-e",
+                    f"SKYDISCOVER_SPLIT={split}",
+                    "-e",
+                    f"SKYDISCOVER_PHASE={phase}",
+                    "-e",
+                    f"SKYDISCOVER_MODE={mode}",
                     self.container_id,
                     "/benchmark/evaluate.sh",
                     candidate_path,

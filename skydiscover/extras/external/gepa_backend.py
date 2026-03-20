@@ -6,18 +6,46 @@ evaluator, and maps domain context (system_prompt) to GEPA's
 objective/background parameters.
 """
 
-import importlib.util
+import asyncio
 import logging
 import os
-import sys
-import tempfile
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict
 
 from skydiscover.api import DiscoveryResult
 from skydiscover.config import Config, _parse_model_spec
+from skydiscover.evaluation.coordinator import merge_prefixed_artifacts, merge_prefixed_metrics
+from skydiscover.evaluation.external_bridge import create_runtime_evaluator
+from skydiscover.utils.metrics import get_authoritative_score
 
 logger = logging.getLogger(__name__)
+
+
+class _SyncRuntimeEvaluator:
+    """Run async evaluator calls from GEPA's synchronous callback in one worker thread."""
+
+    def __init__(self, runtime_evaluator):
+        self._runtime_evaluator = runtime_evaluator
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="gepa-eval")
+
+    def evaluate_program(self, program_solution: str, program_id: str, *, phase: str) -> Any:
+        future = self._executor.submit(
+            lambda: asyncio.run(
+                self._runtime_evaluator.evaluate_program(
+                    program_solution,
+                    program_id,
+                    phase=phase,
+                )
+            )
+        )
+        return future.result()
+
+    def close(self) -> None:
+        try:
+            self._executor.shutdown(wait=True)
+        finally:
+            self._runtime_evaluator.close()
 
 
 # ------------------------------------------------------------------
@@ -26,53 +54,35 @@ logger = logging.getLogger(__name__)
 
 
 def _make_gepa_evaluator(
-    evaluator_path: str, monitor_callback=None, solution_prefix: str = "", solution_suffix: str = ""
+    config_obj: Config,
+    evaluator_path: str,
+    file_suffix: str,
+    monitor_callback=None,
+    solution_prefix: str = "",
+    solution_suffix: str = "",
 ):
     """
-    Wrap a SkyDiscover-style evaluator (evaluate(program_path) -> dict)
+    Wrap a SkyDiscover evaluator
     into a GEPA-style evaluator (evaluate(candidate_str) -> (score, side_info)).
     """
-    spec = importlib.util.spec_from_file_location("_skydiscover_eval", evaluator_path)
-    eval_module = importlib.util.module_from_spec(spec)
-
-    eval_dir = os.path.dirname(os.path.abspath(evaluator_path))
-    if eval_dir not in sys.path:
-        sys.path.insert(0, eval_dir)
-
-    spec.loader.exec_module(eval_module)
-    user_evaluate = eval_module.evaluate
+    runtime_evaluator = create_runtime_evaluator(
+        config_obj,
+        evaluation_file=evaluator_path,
+        file_suffix=file_suffix,
+    )
+    sync_runtime_evaluator = _SyncRuntimeEvaluator(runtime_evaluator)
     eval_counter = [0]
 
     def gepa_evaluator(candidate: str, **kwargs) -> tuple[float, dict]:
-        # Write candidate code to a temp file so the SkyDiscover evaluator can load it.
-        # Reconstruct the full file if prefix/suffix exist (code outside EVOLVE block).
-        full_solution = solution_prefix + candidate + solution_suffix
-        tmp = tempfile.NamedTemporaryFile(
-            mode="w",
-            suffix=".py",
-            prefix="gepa_candidate_",
-            delete=False,
-        )
         try:
-            tmp.write(full_solution)
-            tmp.flush()
-            tmp.close()
-
-            metrics = user_evaluate(tmp.name)
-
-            # Normalise to (score, side_info)
-            if isinstance(metrics, (int, float)):
-                score = float(metrics)
-                metrics = {"combined_score": score}
-            else:
-                score = metrics.get("combined_score")
-                if score is None:
-                    nums = [
-                        float(v)
-                        for v in metrics.values()
-                        if isinstance(v, (int, float)) and not isinstance(v, bool)
-                    ]
-                    score = sum(nums) / len(nums) if nums else 0.0
+            full_solution = solution_prefix + candidate + solution_suffix
+            result = sync_runtime_evaluator.evaluate_program(
+                full_solution,
+                f"gepa_candidate_{eval_counter[0]}",
+                phase="search",
+            )
+            metrics = result.metrics
+            score = float(metrics.get("combined_score", 0.0) or 0.0)
 
             eval_counter[0] += 1
 
@@ -85,10 +95,8 @@ def _make_gepa_evaluator(
                         id=str(uuid.uuid4()),
                         solution=candidate,
                         language="python",
-                        metrics={
-                            "combined_score": float(score),
-                            **(metrics if isinstance(metrics, dict) else {}),
-                        },
+                        metrics=metrics,
+                        artifacts=result.artifacts or {},
                         iteration_found=eval_counter[0],
                         generation=eval_counter[0],
                     )
@@ -96,17 +104,14 @@ def _make_gepa_evaluator(
                 except Exception:
                     logger.debug("Monitor callback error", exc_info=True)
 
-            return float(score), metrics
+            side_info = dict(metrics)
+            side_info.update(result.artifacts or {})
+            return float(score), side_info
         except Exception as e:
             logger.warning("GEPA evaluator error: %s", e)
             return 0.0, {"error": str(e)}
-        finally:
-            try:
-                os.unlink(tmp.name)
-            except OSError:
-                pass
 
-    return gepa_evaluator
+    return gepa_evaluator, sync_runtime_evaluator
 
 
 # ------------------------------------------------------------------
@@ -212,6 +217,7 @@ async def run(
 
     bridge_provider_env(config_obj)
     _ensure_litellm_api_key(config_obj)
+    file_suffix = os.path.splitext(program_path or "")[1] or config_obj.file_suffix or ".py"
 
     with open(program_path, "r") as f:
         seed_solution = f.read()
@@ -231,8 +237,10 @@ async def run(
         seed_solution = seed_solution[start_idx:end_idx]
 
     # Build evaluator adapter
-    evaluator = _make_gepa_evaluator(
+    evaluator, search_runtime_evaluator = _make_gepa_evaluator(
+        config_obj,
         evaluator_path,
+        file_suffix,
         monitor_callback=monitor_callback,
         solution_prefix=prefix,
         solution_suffix=suffix,
@@ -287,6 +295,7 @@ async def run(
             config=gepa_config,
         )
     finally:
+        search_runtime_evaluator.close()
         logging.getLogger().removeHandler(file_handler)
         file_handler.close()
 
@@ -297,7 +306,7 @@ async def run(
         else str(result.best_candidate)
     )
     best_solution = prefix + best_block + suffix
-    best_score = result.val_aggregate_scores[result.best_idx]
+    search_best_score = result.val_aggregate_scores[result.best_idx]
     scores = result.val_aggregate_scores
     initial_score = scores[0] if scores else 0.0
 
@@ -305,10 +314,36 @@ async def run(
         id=str(uuid.uuid4()),
         solution=best_solution,
         language=getattr(config_obj, "language", None) or "python",
-        metrics={"combined_score": best_score},
+        metrics={"combined_score": search_best_score},
         iteration_found=result.best_idx,
         generation=result.best_idx,
     )
+    runtime_evaluator = create_runtime_evaluator(
+        config_obj,
+        evaluation_file=evaluator_path,
+        file_suffix=file_suffix,
+    )
+    try:
+        final_result = await runtime_evaluator.evaluate_program(
+            best_solution,
+            best_program.id,
+            mode="test",
+        )
+    finally:
+        runtime_evaluator.close()
+
+    best_program.metrics = merge_prefixed_metrics(
+        best_program.metrics or {},
+        final_result.metrics,
+        "final_",
+        include_legacy_test_alias=True,
+    )
+    best_program.artifacts = merge_prefixed_artifacts(
+        best_program.artifacts or {},
+        final_result.artifacts or {},
+        final_split_name=config_obj.evaluator.resolved_final_split,
+    )
+    best_score = get_authoritative_score(best_program.metrics)
 
     # Save best program and info to output dir
     import json
@@ -323,6 +358,7 @@ async def run(
                 "id": best_program.id,
                 "iteration": result.best_idx,
                 "best_score": best_score,
+                "search_best_score": search_best_score,
                 "initial_score": initial_score,
                 "total_candidates": result.num_candidates,
             },
@@ -334,7 +370,7 @@ async def run(
         best_program=best_program,
         best_score=best_score,
         best_solution=best_solution,
-        metrics={"combined_score": best_score, "total_candidates": result.num_candidates},
+        metrics={**best_program.metrics, "total_candidates": result.num_candidates},
         output_dir=output_dir,
         initial_score=initial_score,
     )

@@ -93,6 +93,27 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Search algorithm to use",
     )
+    parser.add_argument(
+        "--task-mode",
+        choices=["single_task", "multi_task", "generalization"],
+        default=None,
+        help="Evaluation mode: single_task, multi_task, or generalization",
+    )
+    parser.add_argument(
+        "--train-split",
+        default=None,
+        help="Training split name for split-aware evaluators",
+    )
+    parser.add_argument(
+        "--val-split",
+        default=None,
+        help="Validation split name for generalization mode",
+    )
+    parser.add_argument(
+        "--final-split",
+        default=None,
+        help="Final authoritative split name (defaults to the selection split)",
+    )
 
     return parser.parse_args()
 
@@ -114,7 +135,18 @@ async def main_async() -> int:
         print(f"Error: Evaluation file '{args.evaluation_file}' not found", file=sys.stderr)
         return 1
 
-    has_overrides = any((args.api_base, args.model, args.agentic, args.search))
+    has_overrides = any(
+        (
+            args.api_base,
+            args.model,
+            args.agentic,
+            args.search,
+            args.task_mode,
+            args.train_split,
+            args.val_split,
+            args.final_split,
+        )
+    )
     config = None
 
     # Load the configuration
@@ -128,6 +160,10 @@ async def main_async() -> int:
                 api_base=args.api_base,
                 agentic=args.agentic,
                 search=args.search,
+                task_mode=args.task_mode,
+                train_split=args.train_split,
+                val_split=args.val_split,
+                final_split=args.final_split,
             )
         except ValueError as exc:
             print(f"Error: {exc}", file=sys.stderr)
@@ -148,6 +184,14 @@ async def main_async() -> int:
             print(f"Agentic mode enabled (codebase: {config.agentic.codebase_root})")
         if args.search:
             print(f"Using search algorithm: {args.search}")
+        if args.task_mode:
+            print(f"Using evaluator task mode: {config.evaluator.task_mode}")
+        if args.train_split:
+            print(f"Using train split: {config.evaluator.train_split}")
+        if args.val_split:
+            print(f"Using val split: {config.evaluator.val_split}")
+        if args.final_split:
+            print(f"Using final split: {config.evaluator.final_split}")
 
     # Run the discovery
     try:

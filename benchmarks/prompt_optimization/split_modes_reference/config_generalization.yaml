@@ -1,0 +1,26 @@
+max_iterations: 10
+
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+
+search:
+  type: "topk"
+  num_context_programs: 2
+
+prompt:
+  system_message: |
+    You are optimizing a prompt that must generalize to unseen tasks.
+    Prefer prompts that transfer beyond the training examples.
+
+evaluator:
+  task_mode: "generalization"
+  train_split: "train"
+  val_split: "val"
+  timeout: 60
+  max_retries: 1
+  cascade_evaluation: false
+
+diff_based_generation: false
+max_solution_length: 4000

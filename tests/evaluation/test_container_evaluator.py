@@ -1,7 +1,7 @@
 """Tests for ContainerizedEvaluator — pure logic that doesn't need Docker."""
 
 import json
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -143,3 +143,31 @@ class TestLlmJudgeAttribute:
             inst = ContainerizedEvaluator.__new__(ContainerizedEvaluator)
             ContainerizedEvaluator.__init__(inst, "/tmp/fake", EvaluatorConfig())
             assert inst.llm_judge is None
+
+
+class TestSplitEnvForwarding:
+    def test_run_single_in_container_sets_split_phase_env(self):
+        from skydiscover.config import EvaluatorConfig
+
+        inst = object.__new__(ContainerizedEvaluator)
+        inst.container_id = "abc123"
+        inst.config = EvaluatorConfig(timeout=30)
+        inst._parse_output = ContainerizedEvaluator._parse_output.__get__(inst, ContainerizedEvaluator)
+        inst.close = lambda: None
+
+        with patch("subprocess.run", return_value=MagicMock(returncode=0, stdout=json.dumps({
+            "status": "success",
+            "combined_score": 0.8,
+            "metrics": {"combined_score": 0.8},
+        }), stderr="")) as mock_run:
+            inst._run_single_in_container(
+                "/tmp/candidate.py",
+                "train",
+                split="validation",
+                phase="search",
+            )
+
+        cmd = mock_run.call_args[0][0]
+        assert "SKYDISCOVER_SPLIT=validation" in cmd
+        assert "SKYDISCOVER_PHASE=search" in cmd
+        assert "SKYDISCOVER_MODE=train" in cmd

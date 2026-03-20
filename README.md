@@ -161,6 +161,35 @@ def evaluate(program_path):
 - **combined_score** drives evolution. If omitted, SkyDiscover averages all numeric values in the dict.
 - **artifacts** is optional — entries are injected into the next LLM prompt as context.
 
+### Split-Aware Modes
+
+SkyDiscover now supports three evaluation modes through `evaluator.task_mode`:
+
+- `single_task`: current behavior
+- `multi_task`: evaluate and select on `train_split`
+- `generalization`: evaluate on both `train_split` and `val_split`, but select on `val_split`
+
+For Python evaluators, the split-aware contract is:
+
+```python
+def evaluate(program_path, *, split="train", phase="search"):
+    ...
+    return {
+        "combined_score": score,
+        "artifacts": {"feedback": f"{split} diagnostics"},
+    }
+```
+
+- `split` is the logical data split name such as `train`, `val`, or `test`
+- `phase` is `search` during optimization and `final` during the final authoritative evaluation
+- legacy `evaluate(program_path)` evaluators continue to work unchanged
+
+For containerized and Harbor evaluators, SkyDiscover preserves the existing `train` / `test` mode behavior and also exports:
+
+- `SKYDISCOVER_SPLIT`
+- `SKYDISCOVER_PHASE`
+- `SKYDISCOVER_MODE`
+
 ### Starting Solution (optional)
 
 The initial program is **optional**. When omitted, the LLM generates a solution from scratch. If provided, it marks the region to mutate with EVOLVE-BLOCK markers. Everything outside is left untouched.

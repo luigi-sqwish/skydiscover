@@ -66,9 +66,20 @@ def prepare_evaluator(
         if caller_module is not None:
             setattr(caller_module, evaluator_id, evaluator)
         evaluator_code = (
+            "import inspect\n"
             f"import {caller_module_name} as _api\n\n"
-            f"def evaluate(program_path):\n"
-            f"    return getattr(_api, '{evaluator_id}')(program_path)\n"
+            f"def evaluate(program_path, *, split='train', phase='search'):\n"
+            f"    func = getattr(_api, '{evaluator_id}')\n"
+            "    sig = inspect.signature(func)\n"
+            "    accepts_kwargs = any(\n"
+            "        p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()\n"
+            "    )\n"
+            "    kwargs = {}\n"
+            "    if accepts_kwargs or 'split' in sig.parameters:\n"
+            "        kwargs['split'] = split\n"
+            "    if accepts_kwargs or 'phase' in sig.parameters:\n"
+            "        kwargs['phase'] = phase\n"
+            "    return func(program_path, **kwargs)\n"
         )
     else:
         evaluator_code = str(evaluator)

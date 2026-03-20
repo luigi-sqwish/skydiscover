@@ -1,6 +1,7 @@
 import asyncio
 import errno
 import importlib.util
+import inspect
 import logging
 import os
 import sys
@@ -94,14 +95,17 @@ class Evaluator:
         program_solution: str,
         program_id: str = "",
         mode: str = "train",
+        split: str = "train",
+        phase: str = "search",
     ) -> EvaluationResult:
         """Evaluate a program and return scores with optional artifacts.
 
         Args:
             program_solution: Source code of the candidate program.
             program_id: Optional identifier for logging.
-            mode: ``"train"`` or ``"test"``.  Ignored by the Python evaluator
-                  (the containerized evaluator passes it to evaluate.sh).
+            mode: ``"train"`` or ``"test"``.  Preserved for compatibility.
+            split: Logical data split name for split-aware evaluators.
+            phase: ``"search"`` or ``"final"``.
         """
         start_time = time.time()
         label = f" {program_id}" if program_id else ""
@@ -129,9 +133,14 @@ class Evaluator:
 
             try:
                 if self.config.cascade_evaluation:
-                    result = await self._cascade_evaluate(temp_path)
+                    result = await self._cascade_evaluate(temp_path, split=split, phase=phase)
                 else:
-                    result = await self._run_stage(self.evaluate_function, temp_path)
+                    result = await self._run_stage(
+                        self.evaluate_function,
+                        temp_path,
+                        split=split,
+                        phase=phase,
+                    )
 
                 eval_result = self._normalize_result(result)
 
@@ -199,14 +208,38 @@ class Evaluator:
     # Internals
     # ------------------------------------------------------------------
 
-    async def _run_stage(self, func, program_path: str) -> Any:
+    async def _run_stage(
+        self,
+        func,
+        program_path: str,
+        *,
+        split: str = "train",
+        phase: str = "search",
+    ) -> Any:
         """Run a single evaluation function in a thread with timeout."""
         loop = asyncio.get_running_loop()
 
         return await asyncio.wait_for(
-            loop.run_in_executor(None, func, program_path),
+            loop.run_in_executor(
+                None,
+                lambda: self._invoke_function(func, program_path, split=split, phase=phase),
+            ),
             timeout=self.config.timeout,
         )
+
+    def _invoke_function(self, func, program_path: str, *, split: str, phase: str) -> Any:
+        sig = inspect.signature(func)
+        accepts_kwargs = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+        )
+
+        kwargs = {}
+        if accepts_kwargs or "split" in sig.parameters:
+            kwargs["split"] = split
+        if accepts_kwargs or "phase" in sig.parameters:
+            kwargs["phase"] = phase
+
+        return func(program_path, **kwargs)
 
     def _normalize_result(self, result: Any) -> EvaluationResult:
         if isinstance(result, EvaluationResult):
@@ -217,19 +250,35 @@ class Evaluator:
         logger.warning(f"Unexpected result type: {type(result)}")
         return EvaluationResult(metrics={"error": 0.0})
 
-    async def _cascade_evaluate(self, program_path: str) -> EvaluationResult:
+    async def _cascade_evaluate(
+        self,
+        program_path: str,
+        *,
+        split: str = "train",
+        phase: str = "search",
+    ) -> EvaluationResult:
         """Run cascade evaluation: stage1 → threshold check → stage2 → merge."""
         module = self._eval_module
 
         if not hasattr(module, "evaluate_stage1"):
             return self._normalize_result(
-                await self._run_stage(self.evaluate_function, program_path)
+                await self._run_stage(
+                    self.evaluate_function,
+                    program_path,
+                    split=split,
+                    phase=phase,
+                )
             )
 
         # Stage 1
         try:
             stage1 = self._normalize_result(
-                await self._run_stage(module.evaluate_stage1, program_path)
+                await self._run_stage(
+                    module.evaluate_stage1,
+                    program_path,
+                    split=split,
+                    phase=phase,
+                )
             )
         except asyncio.TimeoutError:
             logger.error(f"Stage 1 timed out ({self.config.timeout}s)")
@@ -257,7 +306,12 @@ class Evaluator:
         # Stage 2
         try:
             stage2 = self._normalize_result(
-                await self._run_stage(module.evaluate_stage2, program_path)
+                await self._run_stage(
+                    module.evaluate_stage2,
+                    program_path,
+                    split=split,
+                    phase=phase,
+                )
             )
         except asyncio.TimeoutError:
             logger.error(f"Stage 2 timed out ({self.config.timeout}s)")

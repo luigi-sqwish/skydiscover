@@ -80,7 +80,13 @@ class HarborEvaluator(ContainerizedEvaluator):
     # Override: container interaction
     # ------------------------------------------------------------------
 
-    def _run_container(self, program_solution: str, mode: str) -> EvaluationResult:
+    def _run_container(
+        self,
+        program_solution: str,
+        mode: str,
+        split: str = "train",
+        phase: str = "search",
+    ) -> EvaluationResult:
         """Inject solution, run tests, read reward."""
         # Clear stale reward files from previous evaluations.
         self._exec("rm -f /logs/verifier/reward.txt /logs/verifier/reward.json")
@@ -115,6 +121,12 @@ class HarborEvaluator(ContainerizedEvaluator):
                 [
                     "docker",
                     "exec",
+                    "-e",
+                    f"SKYDISCOVER_SPLIT={split}",
+                    "-e",
+                    f"SKYDISCOVER_PHASE={phase}",
+                    "-e",
+                    f"SKYDISCOVER_MODE={mode}",
                     self.container_id,
                     "bash",
                     "-c",

@@ -31,6 +31,10 @@ prompt:
     real-world production readiness in your assessment.
 
 evaluator:
+  task_mode: "single_task"  # single_task | multi_task | generalization
+  train_split: "train"
+  # val_split: "val"        # required for generalization
+  # final_split: "test"     # optional; defaults to the selection split
   timeout: 60
   max_retries: 1
   cascade_evaluation: false

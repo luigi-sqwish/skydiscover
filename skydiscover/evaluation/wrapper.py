@@ -12,6 +12,8 @@ Usage — add this to the bottom of your evaluator.py::
 """
 
 import json
+import inspect
+import os
 import sys
 import traceback
 
@@ -35,8 +37,21 @@ def run(evaluate_fn):
     # the evaluator don't contaminate the JSON output on stdout.
     real_stdout = sys.stdout
     sys.stdout = sys.stderr
+    split = os.environ.get("SKYDISCOVER_SPLIT", "train")
+    phase = os.environ.get("SKYDISCOVER_PHASE")
+    if phase is None:
+        phase = "final" if os.environ.get("SKYDISCOVER_MODE") == "test" else "search"
+
+    sig = inspect.signature(evaluate_fn)
+    accepts_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+    kwargs = {}
+    if accepts_kwargs or "split" in sig.parameters:
+        kwargs["split"] = split
+    if accepts_kwargs or "phase" in sig.parameters:
+        kwargs["phase"] = phase
+
     try:
-        result = evaluate_fn(program_path)
+        result = evaluate_fn(program_path, **kwargs)
     except Exception as e:
         sys.stdout = real_stdout
         print(

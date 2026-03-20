@@ -12,6 +12,12 @@ from typing import Optional
 
 from skydiscover.api import DiscoveryResult
 from skydiscover.config import Config
+from skydiscover.evaluation.coordinator import merge_prefixed_artifacts, merge_prefixed_metrics
+from skydiscover.evaluation.external_bridge import (
+    create_runtime_evaluator,
+    write_external_evaluator_bridge,
+)
+from skydiscover.utils.metrics import get_authoritative_score
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +189,14 @@ async def run(
 
     bridge_provider_env(config_obj)
 
+    file_suffix = os.path.splitext(program_path or "")[1] or config_obj.file_suffix or ".py"
+    evaluator_bridge_path = write_external_evaluator_bridge(
+        config_obj=config_obj,
+        evaluation_file=evaluator_path,
+        file_suffix=file_suffix,
+        output_dir=output_dir,
+    )
+
     oe_config = _map_config(config_obj, iterations, output_dir)
 
     # Human feedback: set initial system prompt on feedback reader for dashboard visibility
@@ -194,7 +208,7 @@ async def run(
 
     controller = OpenEvolve(
         initial_program_path=program_path,
-        evaluation_file=evaluator_path,
+        evaluation_file=evaluator_bridge_path,
         config=oe_config,
         output_dir=output_dir,
     )
@@ -278,12 +292,39 @@ async def run(
 
     best_skydiscover = _to_skydiscover_program(best) if best else None
     best_score = _score_of(best.metrics) if best else 0.0
+    if best and best_skydiscover:
+        runtime_evaluator = create_runtime_evaluator(
+            config_obj,
+            evaluation_file=evaluator_path,
+            file_suffix=file_suffix,
+        )
+        try:
+            final_result = await runtime_evaluator.evaluate_program(
+                best.code,
+                best.id,
+                mode="test",
+            )
+        finally:
+            runtime_evaluator.close()
+
+        best_skydiscover.metrics = merge_prefixed_metrics(
+            best_skydiscover.metrics or {},
+            final_result.metrics,
+            "final_",
+            include_legacy_test_alias=True,
+        )
+        best_skydiscover.artifacts = merge_prefixed_artifacts(
+            best_skydiscover.artifacts or {},
+            final_result.artifacts or {},
+            final_split_name=config_obj.evaluator.resolved_final_split,
+        )
+        best_score = get_authoritative_score(best_skydiscover.metrics)
 
     return DiscoveryResult(
         best_program=best_skydiscover,
         best_score=best_score or 0.0,
         best_solution=best.code if best else "",
-        metrics=(best.metrics or {}) if best else {},
+        metrics=(best_skydiscover.metrics or {}) if best_skydiscover else {},
         output_dir=output_dir,
         initial_score=initial_score,
     )

@@ -77,6 +77,14 @@ There are three ways to set up a benchmark: a **containerized evaluator** (recom
 
 The `evaluator/` directory is the Docker build context. Everything inside it gets copied into the image — data files, model weights, test fixtures, etc. SkyDiscover auto-detects this layout when `evaluation_file` points to a directory containing a `Dockerfile` and `evaluate.sh`.
 
+SkyDiscover also supports split-aware evaluation through `evaluator.task_mode`:
+
+- `single_task`
+- `multi_task`
+- `generalization`
+
+In `generalization`, candidates are scored on both the training and validation splits, but the framework keeps and samples programs using validation metrics.
+
 ### Plain Python evaluator
 
 ```
@@ -104,6 +112,11 @@ set -euo pipefail
 
 PROGRAM="$1"   # Path to the candidate solution inside the container
 MODE="$2"      # "train" (fast, iterative) or "test" (authoritative, final)
+
+# Additional split-aware context is available via:
+#   SKYDISCOVER_SPLIT=train|val|...
+#   SKYDISCOVER_PHASE=search|final
+#   SKYDISCOVER_MODE=train|test
 
 python /benchmark/evaluator.py "$PROGRAM"
 ```
@@ -271,6 +284,15 @@ def evaluate(program_path: str) -> dict:
 
 `program_path` is a `.py` file for code tasks or a `.txt` file for prompt tasks. On failure, return `{"combined_score": 0.0, "error": "..."}` instead of raising.
 
+Split-aware Python evaluators can optionally accept keyword-only split information:
+
+```python
+def evaluate(program_path: str, *, split: str = "train", phase: str = "search") -> dict:
+    ...
+```
+
+Legacy `evaluate(program_path)` evaluators continue to work unchanged.
+
 ### Seed program
 
 **Seed** (`initial_program.py` or `initial_prompt.txt`) is the starting solution. Mark the region for the LLM to evolve:
@@ -288,4 +310,7 @@ For prompt optimization, use a plain `.txt` file with no markers.
 
 **Config** (`config.yaml`) sets the system prompt and search settings. For prompt optimization, set `language: text` and `diff_based_generation: false`.
 
-Simple prompt example to copy: [`prompt_optimization/hotpot_qa/`](prompt_optimization/hotpot_qa/)
+Simple prompt examples to copy:
+
+- [`prompt_optimization/hotpot_qa/`](prompt_optimization/hotpot_qa/)
+- [`prompt_optimization/split_modes_reference/`](prompt_optimization/split_modes_reference/)

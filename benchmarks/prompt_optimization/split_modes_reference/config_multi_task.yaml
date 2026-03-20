@@ -1,0 +1,25 @@
+max_iterations: 10
+
+llm:
+  models:
+    - name: "gpt-5"
+      weight: 1.0
+
+search:
+  type: "topk"
+  num_context_programs: 2
+
+prompt:
+  system_message: |
+    You are optimizing a prompt for a family of related tasks.
+    Improve the prompt while keeping it concise and useful.
+
+evaluator:
+  task_mode: "multi_task"
+  train_split: "train"
+  timeout: 60
+  max_retries: 1
+  cascade_evaluation: false
+
+diff_based_generation: false
+max_solution_length: 4000

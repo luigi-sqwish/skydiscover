@@ -1,0 +1,5 @@
+# GPT-5.4 supports a 1.05M-token context window.
+# Codex currently applies internal headroom, so 1,000,000 yields ~950,000 effective tokens.
+model = "gpt-5.4"
+model_context_window = 1000000
+model_auto_compact_token_limit = 900000

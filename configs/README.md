@@ -259,6 +259,10 @@ prompt:
 
 ```yaml
 evaluator:
+  task_mode: "single_task"  # single_task | multi_task | generalization
+  train_split: "train"      # logical training split name
+  val_split: null           # required for generalization
+  final_split: null         # defaults to the selection split
   timeout: 360            # seconds before killing evaluate() subprocess
   max_retries: 3
 
@@ -270,6 +274,10 @@ evaluator:
   use_llm_feedback: false
   llm_feedback_weight: 1.0  # relative weight of LLM score in combined_score
 ```
+
+- `single_task`: current behavior
+- `multi_task`: search and select on `train_split`
+- `generalization`: evaluate both `train_split` and `val_split`, but select on `val_split`
 
 ### agentic
 

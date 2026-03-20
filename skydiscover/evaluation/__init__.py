@@ -20,6 +20,7 @@ Supporting modules:
 import os
 from typing import Optional, Union
 
+from skydiscover.evaluation.coordinator import SplitEvaluationCoordinator
 from skydiscover.evaluation.container_evaluator import ContainerizedEvaluator
 from skydiscover.evaluation.evaluation_result import EvaluationResult
 from skydiscover.evaluation.evaluator import Evaluator
@@ -33,6 +34,7 @@ __all__ = [
     "HarborEvaluator",
     "LLMJudge",
     "create_evaluator",
+    "create_raw_evaluator",
 ]
 
 
@@ -56,7 +58,7 @@ def _is_containerized(path: str) -> bool:
     )
 
 
-def create_evaluator(
+def create_raw_evaluator(
     config,
     llm_judge: Optional[LLMJudge] = None,
     max_concurrent: int = 4,
@@ -68,9 +70,24 @@ def create_evaluator(
       2. Containerized — Dockerfile + evaluate.sh
       3. Python evaluator — fallback
     """
+    config.validate()
     path = config.evaluation_file or ""
     if _is_harbor_task(path):
         return HarborEvaluator(path, config, max_concurrent=max_concurrent)
     if _is_containerized(path):
         return ContainerizedEvaluator(path, config, max_concurrent=max_concurrent)
     return Evaluator(config, llm_judge=llm_judge, max_concurrent=max_concurrent)
+
+
+def create_evaluator(
+    config,
+    llm_judge: Optional[LLMJudge] = None,
+    max_concurrent: int = 4,
+) -> SplitEvaluationCoordinator:
+    """Return a split-aware evaluator coordinator for the given config."""
+    raw_evaluator = create_raw_evaluator(
+        config,
+        llm_judge=llm_judge,
+        max_concurrent=max_concurrent,
+    )
+    return SplitEvaluationCoordinator(raw_evaluator, config)

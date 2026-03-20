@@ -16,6 +16,10 @@ from skydiscover.search.default_discovery_controller import (
 from skydiscover.search.registry import create_database, get_program
 from skydiscover.search.route import get_discovery_controller
 from skydiscover.search.utils.logging_utils import setup_search_logging
+from skydiscover.evaluation.coordinator import (
+    merge_prefixed_artifacts,
+    merge_prefixed_metrics,
+)
 from skydiscover.utils.code_utils import extract_solution_language
 from skydiscover.utils.metrics import format_metrics, get_score
 
@@ -187,8 +191,17 @@ class Runner:
                     test_result = await self.discovery_controller.evaluator.evaluate_program(
                         best.solution, best.id, mode="test"
                     )
-                    for k, v in test_result.metrics.items():
-                        best.metrics[f"test_{k}"] = v
+                    best.metrics = merge_prefixed_metrics(
+                        best.metrics or {},
+                        test_result.metrics,
+                        "final_",
+                        include_legacy_test_alias=True,
+                    )
+                    best.artifacts = merge_prefixed_artifacts(
+                        best.artifacts or {},
+                        test_result.artifacts or {},
+                        final_split_name=self.config.evaluator.resolved_final_split,
+                    )
                     logger.info(
                         f"Test evaluation for best program: {format_metrics(test_result.metrics)}"
                     )
